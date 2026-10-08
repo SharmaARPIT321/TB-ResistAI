@@ -383,12 +383,9 @@ comparison, performance evaluation, expanded-feature experiments,
 unseen-data evaluation, independent external cross-dataset validation,
 generalization analysis, and final ML analysis.
 
-### Akash Khushwaha --- Data Processing & Initial Analysis
+### Akash Khushawaha — Data Processing, Feature Engineering & Machine Learning
 
-Contributed to raw-data preprocessing, data cleaning, initial
-preprocessing, initial genomic feature setup, and the initial
-single-mutation analysis that established the foundation for subsequent
-ML experiments.
+Contributed to raw-data preprocessing, data cleaning, quality control, initial genomic feature setup, and single-mutation analysis that established the foundation for subsequent ML experiments. Worked on transforming genomic mutation information into ML-ready features and contributed to the machine-learning workflow, including model training concepts, performance evaluation, and interpretation of TB drug-resistance prediction results.
 
 ------------------------------------------------------------------------
 
