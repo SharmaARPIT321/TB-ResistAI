@@ -8,7 +8,7 @@ import streamlit as st
 
 
 # ============================================================
-# 1. PAGE CONFIGURATION
+# 1. PAGE CONFIG
 # ============================================================
 
 st.set_page_config(
@@ -19,7 +19,7 @@ st.set_page_config(
 
 
 # ============================================================
-# 2. PATHS
+# 2. PROJECT PATH
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -27,179 +27,113 @@ MODEL_DIR = BASE_DIR / "models"
 
 
 # ============================================================
-# 3. FINAL MODEL CONFIGURATION
+# 3. MODEL LOCATIONS
 # ============================================================
 
-FINAL_CONFIG = {
-    "Rifampicin": {
-        "folder": "rifampicin",
-        "model_name": "Random Forest",
-        "feature_count": 30,
-        "threshold": 0.72,
-    },
-
-    "Isoniazid": {
-        "folder": "isoniazid",
-        "model_name": "Logistic Regression",
-        "feature_count": 2,
-        "threshold": 0.50,
-    },
-
-    "Ethambutol": {
-        "folder": "ethambutol",
-        "model_name": "Random Forest",
-        "feature_count": 8,
-        "threshold": 0.32,
-    },
+MODEL_PATHS = {
+    "Rifampicin": MODEL_DIR / "rifampicin" / "model.joblib",
+    "Isoniazid": MODEL_DIR / "isoniazid" / "model.joblib",
+    "Ethambutol": MODEL_DIR / "ethambutol" / "model.joblib",
 }
 
 
 # ============================================================
-# 4. LOAD MODEL
+# 4. LOAD SAVED MODEL BUNDLE
 # ============================================================
 
 @st.cache_resource
-def load_model(drug):
+def load_model_bundle(drug):
 
-    config = FINAL_CONFIG[drug]
-
-    model_path = (
-        MODEL_DIR
-        / config["folder"]
-        / "model.joblib"
-    )
+    model_path = MODEL_PATHS[drug]
 
     if not model_path.exists():
         raise FileNotFoundError(
-            f"Model file not found:\n{model_path}"
+            f"{drug} model not found:\n{model_path}"
         )
 
-    return joblib.load(model_path)
+    bundle = joblib.load(model_path)
 
-
-# ============================================================
-# 5. LOAD FEATURE MANIFEST
-# ============================================================
-
-@st.cache_data
-def load_features(drug):
-
-    config = FINAL_CONFIG[drug]
-
-    feature_path = (
-        MODEL_DIR
-        / config["folder"]
-        / "features.json"
-    )
-
-    if not feature_path.exists():
-        raise FileNotFoundError(
-            f"Feature manifest not found:\n{feature_path}"
-        )
-
-    with open(feature_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    # Support several possible JSON formats
-    if isinstance(data, list):
-        features = data
-
-    elif isinstance(data, dict):
-
-        if "features" in data:
-            features = data["features"]
-
-        elif "feature_names" in data:
-            features = data["feature_names"]
-
-        else:
-            raise ValueError(
-                f"Could not find feature list in {feature_path}"
-            )
-
-    else:
+    if not isinstance(bundle, dict):
         raise ValueError(
-            f"Unsupported feature JSON format: {feature_path}"
+            f"{drug}: saved file is not a model bundle."
         )
 
-    return [str(x) for x in features]
+    if "estimator" not in bundle:
+        raise ValueError(
+            f"{drug}: 'estimator' not found in saved model."
+        )
+
+    if "feature_names" not in bundle:
+        raise ValueError(
+            f"{drug}: 'feature_names' not found in saved model."
+        )
+
+    return bundle
+
+
+# ============================================================
+# 5. CREATE FEATURE VECTOR
+# ============================================================
+
+def create_feature_vector(selected_mutations, feature_names):
+
+    selected = set(selected_mutations)
+
+    values = []
+
+    for feature in feature_names:
+
+        if feature in selected:
+            values.append(1)
+        else:
+            values.append(0)
+
+    return np.array(values, dtype=np.int64).reshape(1, -1)
 
 
 # ============================================================
 # 6. GET RESISTANCE PROBABILITY
 # ============================================================
 
-def get_resistance_probability(model, X):
+def get_resistance_probability(bundle, X):
 
-    if not hasattr(model, "predict_proba"):
+    estimator = bundle["estimator"]
+
+    if not hasattr(estimator, "predict_proba"):
+
         raise ValueError(
-            "The saved model does not support predict_proba()."
+            f"The saved estimator "
+            f"{type(estimator).__name__} "
+            f"does not support predict_proba()."
         )
 
-    probabilities = model.predict_proba(X)[0]
+    probabilities = estimator.predict_proba(X)[0]
 
-    classes = getattr(model, "classes_", None)
+    # Your saved bundle contains this value
+    positive_column = bundle.get(
+        "positive_probability_column",
+        1
+    )
 
-    # Most of your binary models should use 0/1
-    if classes is not None:
-
-        # Find class corresponding to resistant = 1
-        if 1 in classes:
-            resistant_index = list(classes).index(1)
-            return float(probabilities[resistant_index])
-
-        # Handle string class labels
-        normalized = [str(c).strip().lower() for c in classes]
-
-        resistant_labels = {
-            "resistant",
-            "r",
-            "1"
-        }
-
-        for i, label in enumerate(normalized):
-
-            if label in resistant_labels:
-                return float(probabilities[i])
-
-    # Fallback for standard binary classifier
-    return float(probabilities[-1])
+    return float(probabilities[positive_column])
 
 
 # ============================================================
-# 7. CREATE MODEL INPUT
-# ============================================================
-
-def create_feature_vector(selected_mutations, features):
-
-    vector = []
-
-    selected_set = set(selected_mutations)
-
-    for feature in features:
-
-        if feature in selected_set:
-            vector.append(1)
-        else:
-            vector.append(0)
-
-    return np.array(vector).reshape(1, -1)
-
-
-# ============================================================
-# 8. PAGE HEADER
+# 7. HEADER
 # ============================================================
 
 st.title("🧬 TB-ResistAI")
 
 st.subheader(
-    "Genomic Mutation-Based Tuberculosis Drug-Resistance Prediction"
+    "Genomic Mutation-Based Tuberculosis "
+    "Drug-Resistance Prediction"
 )
 
 st.write(
     """
-    Enter the detected mutation profile to evaluate predicted
-    resistance across the evaluated first-line TB drugs.
+    Enter the detected mutation profile. The application
+    automatically evaluates the selected mutation profile
+    using the finalized model for each evaluated drug.
     """
 )
 
@@ -213,24 +147,32 @@ st.info(
 
 
 # ============================================================
-# 9. LOAD ALL FEATURE LISTS
+# 8. LOAD ALL THREE MODEL BUNDLES
 # ============================================================
 
 try:
 
-    rif_features = load_features("Rifampicin")
-    inh_features = load_features("Isoniazid")
-    emb_features = load_features("Ethambutol")
+    rif_bundle = load_model_bundle("Rifampicin")
+    inh_bundle = load_model_bundle("Isoniazid")
+    emb_bundle = load_model_bundle("Ethambutol")
 
 except Exception as e:
 
     st.error(str(e))
-
     st.stop()
 
 
 # ============================================================
-# 10. COMBINE FEATURES
+# 9. GET EXACT FEATURES FROM SAVED MODELS
+# ============================================================
+
+rif_features = rif_bundle["feature_names"]
+inh_features = inh_bundle["feature_names"]
+emb_features = emb_bundle["feature_names"]
+
+
+# ============================================================
+# 10. COMBINE FEATURES FOR USER INPUT
 # ============================================================
 
 all_features = sorted(
@@ -243,7 +185,52 @@ all_features = sorted(
 
 
 # ============================================================
-# 11. MUTATION INPUT
+# 11. MODEL INFORMATION
+# ============================================================
+
+st.header("🤖 Final Model Configuration")
+
+model_information = []
+
+for drug, bundle in [
+    ("Rifampicin", rif_bundle),
+    ("Isoniazid", inh_bundle),
+    ("Ethambutol", emb_bundle)
+]:
+
+    model_information.append({
+
+        "Drug": drug,
+
+        "Final Model": bundle.get(
+            "model_name",
+            type(bundle["estimator"]).__name__
+        ),
+
+        "Features": len(
+            bundle["feature_names"]
+        ),
+
+        "Decision Threshold": float(
+            bundle["threshold"]
+        )
+
+    })
+
+
+model_table = pd.DataFrame(
+    model_information
+)
+
+st.dataframe(
+    model_table,
+    use_container_width=True,
+    hide_index=True
+)
+
+
+# ============================================================
+# 12. MUTATION INPUT
 # ============================================================
 
 st.header("🧬 Mutation Input")
@@ -252,20 +239,19 @@ st.write(
     f"""
     Select the mutations detected in the sample.
 
-    The application will automatically determine which
-    mutations belong to the feature set of each drug model.
+    Available model features: {len(all_features)}
     """
 )
 
 selected_mutations = st.multiselect(
     "Select detected mutations",
     options=all_features,
-    help="Select all mutations detected in the sample."
+    help="Select the mutations detected in the sample."
 )
 
 
 # ============================================================
-# 12. SHOW SELECTED MUTATIONS
+# 13. SHOW SELECTED MUTATIONS
 # ============================================================
 
 if selected_mutations:
@@ -277,53 +263,16 @@ if selected_mutations:
     with st.expander("View selected mutations"):
 
         for mutation in selected_mutations:
-            st.write(f"✓ {mutation}")
+
+            st.write(
+                f"✓ {mutation}"
+            )
 
 else:
 
     st.warning(
-        "Please select at least one mutation before analysis."
+        "Select at least one mutation before analysis."
     )
-
-
-# ============================================================
-# 13. MODEL INFORMATION
-# ============================================================
-
-st.header("🤖 Final Model Configuration")
-
-model_table = pd.DataFrame({
-
-    "Drug": [
-        "Rifampicin",
-        "Isoniazid",
-        "Ethambutol"
-    ],
-
-    "Final Model": [
-        "Random Forest",
-        "Logistic Regression",
-        "Random Forest"
-    ],
-
-    "Features": [
-        30,
-        2,
-        8
-    ],
-
-    "Decision Threshold": [
-        0.72,
-        0.50,
-        0.32
-    ]
-})
-
-st.dataframe(
-    model_table,
-    use_container_width=True,
-    hide_index=True
-)
 
 
 # ============================================================
@@ -351,54 +300,115 @@ if analyze:
 
         st.stop()
 
+
     results = []
 
-    drugs = [
-        "Rifampicin",
-        "Isoniazid",
-        "Ethambutol"
+
+    drug_bundles = [
+        ("Rifampicin", rif_bundle),
+        ("Isoniazid", inh_bundle),
+        ("Ethambutol", emb_bundle)
     ]
 
-    for drug in drugs:
+
+    for drug, bundle in drug_bundles:
 
         try:
 
-            config = FINAL_CONFIG[drug]
+            # ------------------------------------------------
+            # Exact estimator saved during training
+            # ------------------------------------------------
 
-            model = load_model(drug)
+            estimator = bundle["estimator"]
 
-            features = load_features(drug)
+
+            # ------------------------------------------------
+            # Exact feature order used during training
+            # ------------------------------------------------
+
+            feature_names = bundle["feature_names"]
+
+
+            # ------------------------------------------------
+            # Exact threshold selected during research
+            # ------------------------------------------------
+
+            threshold = float(
+                bundle["threshold"]
+            )
+
+
+            # ------------------------------------------------
+            # Create model input
+            # ------------------------------------------------
 
             X = create_feature_vector(
                 selected_mutations,
-                features
+                feature_names
             )
 
-            # Verify feature count
-            if X.shape[1] != len(features):
+
+            # ------------------------------------------------
+            # Safety check
+            # ------------------------------------------------
+
+            expected_features = len(
+                feature_names
+            )
+
+            actual_features = X.shape[1]
+
+            if expected_features != actual_features:
 
                 raise ValueError(
-                    f"{drug}: feature vector mismatch."
+                    f"Feature mismatch. "
+                    f"Expected {expected_features}, "
+                    f"got {actual_features}."
                 )
 
-            probability = get_resistance_probability(
-                model,
-                X
+
+            # ------------------------------------------------
+            # Probability
+            # ------------------------------------------------
+
+            probability = (
+                get_resistance_probability(
+                    bundle,
+                    X
+                )
             )
 
-            threshold = config["threshold"]
+
+            # ------------------------------------------------
+            # Prediction using saved threshold
+            # ------------------------------------------------
 
             prediction = (
+
                 "Resistant"
+
                 if probability >= threshold
+
                 else "Predicted susceptible"
+
             )
+
+
+            # ------------------------------------------------
+            # Model name
+            # ------------------------------------------------
+
+            model_name = bundle.get(
+                "model_name",
+                type(estimator).__name__
+            )
+
 
             results.append({
 
                 "Drug": drug,
 
-                "Model": config["model_name"],
+                "Model": model_name,
 
                 "Resistance Probability":
                     probability,
@@ -407,9 +417,10 @@ if analyze:
                     threshold,
 
                 "Prediction":
-                    prediction,
+                    prediction
 
             })
+
 
         except Exception as e:
 
@@ -417,31 +428,47 @@ if analyze:
                 f"{drug}: {str(e)}"
             )
 
+
     # ========================================================
     # 16. DISPLAY RESULTS
     # ========================================================
 
     if results:
 
-        result_df = pd.DataFrame(results)
+        result_df = pd.DataFrame(
+            results
+        )
 
-        st.header("📊 Prediction Summary")
+
+        st.header(
+            "📊 Prediction Summary"
+        )
+
 
         display_df = result_df.copy()
+
 
         display_df[
             "Resistance Probability"
         ] = (
+
             display_df[
                 "Resistance Probability"
             ] * 100
+
         ).round(2).astype(str) + "%"
+
 
         display_df[
             "Threshold"
         ] = (
-            display_df["Threshold"] * 100
+
+            display_df[
+                "Threshold"
+            ] * 100
+
         ).round(0).astype(int).astype(str) + "%"
+
 
         st.dataframe(
             display_df,
@@ -449,39 +476,104 @@ if analyze:
             hide_index=True
         )
 
+
         # ====================================================
-        # 17. PROBABILITY VISUALIZATION
+        # 17. INDIVIDUAL DRUG RESULTS
         # ====================================================
 
         st.subheader(
-            "Resistance Probability Comparison"
+            "Drug-wise Prediction"
         )
 
+
+        columns = st.columns(3)
+
+
+        for column, (_, row) in zip(
+            columns,
+            result_df.iterrows()
+        ):
+
+            with column:
+
+                st.markdown(
+                    f"### {row['Drug']}"
+                )
+
+                st.metric(
+                    "Resistance probability",
+                    f"{row['Resistance Probability'] * 100:.1f}%"
+                )
+
+                st.write(
+                    f"**Model:** {row['Model']}"
+                )
+
+                st.write(
+                    f"**Threshold:** "
+                    f"{row['Threshold']:.2f}"
+                )
+
+                if row["Prediction"] == "Resistant":
+
+                    st.error(
+                        "Predicted resistant"
+                    )
+
+                else:
+
+                    st.success(
+                        "Predicted susceptible"
+                    )
+
+
+        # ====================================================
+        # 18. COMPARISON
+        # ====================================================
+
+        st.subheader(
+            "📈 Resistance Probability Comparison"
+        )
+
+
         chart_df = result_df[
-            ["Drug", "Resistance Probability"]
+            [
+                "Drug",
+                "Resistance Probability"
+            ]
         ].copy()
 
-        chart_df = chart_df.set_index("Drug")
+
+        chart_df = chart_df.set_index(
+            "Drug"
+        )
+
 
         chart_df[
             "Resistance Probability"
         ] *= 100
 
+
         st.bar_chart(
             chart_df
         )
 
+
         # ====================================================
-        # 18. INTERPRETATION
+        # 19. LOWEST PREDICTED RESISTANCE
         # ====================================================
 
         lowest = result_df.loc[
-            result_df["Resistance Probability"].idxmin()
+            result_df[
+                "Resistance Probability"
+            ].idxmin()
         ]
+
 
         st.subheader(
             "🔎 Model Interpretation"
         )
+
 
         st.write(
             f"""
@@ -491,28 +583,32 @@ if analyze:
             """
         )
 
+
         st.warning(
             """
-            A lower model-predicted resistance probability does
-            not constitute a recommendation to use that drug.
-            Clinical treatment decisions require laboratory
-            susceptibility testing and professional assessment.
-            """
+            This comparison is a model-based research result,
+            not a recommendation for clinical treatment.
+            Laboratory susceptibility testing and clinical
+            assessment are required for treatment decisions.
+            """ 
         )
 
 
 # ============================================================
-# 19. MODEL VALIDATION
+# 20. VALIDATION INFORMATION
 # ============================================================
 
-st.header("📈 Model Validation")
+st.header(
+    "📈 Model Validation"
+)
 
 st.write(
     """
-    The models were selected based on their performance during
-    model evaluation and external/generalization analysis.
+    The final models were selected based on model evaluation
+    and external/generalization analysis.
     """
 )
+
 
 validation_table = pd.DataFrame({
 
@@ -523,24 +619,53 @@ validation_table = pd.DataFrame({
     ],
 
     "Selected Model": [
-        "Random Forest",
-        "Logistic Regression",
-        "Random Forest"
+
+        rif_bundle.get(
+            "model_name",
+            type(
+                rif_bundle["estimator"]
+            ).__name__
+        ),
+
+        inh_bundle.get(
+            "model_name",
+            type(
+                inh_bundle["estimator"]
+            ).__name__
+        ),
+
+        emb_bundle.get(
+            "model_name",
+            type(
+                emb_bundle["estimator"]
+            ).__name__
+        )
     ],
 
     "Feature Count": [
-        30,
-        2,
-        8
+
+        len(
+            rif_bundle["feature_names"]
+        ),
+
+        len(
+            inh_bundle["feature_names"]
+        ),
+
+        len(
+            emb_bundle["feature_names"]
+        )
     ],
 
-    "Threshold": [
-        0.72,
-        0.50,
-        0.32
-    ],
+    "Decision Threshold": [
+
+        rif_bundle["threshold"],
+        inh_bundle["threshold"],
+        emb_bundle["threshold"]
+    ]
 
 })
+
 
 st.dataframe(
     validation_table,
@@ -550,37 +675,40 @@ st.dataframe(
 
 
 # ============================================================
-# 20. EXPLANATION OF METRICS
+# 21. METRIC EXPLANATION
 # ============================================================
 
-with st.expander("What do the evaluation metrics mean?"):
+with st.expander(
+    "📚 What do ROC-AUC, F1, sensitivity and specificity mean?"
+):
 
     st.markdown(
         """
-        **ROC-AUC** measures the model's ability to distinguish
-        between resistant and susceptible samples across
-        classification thresholds.
+        **ROC-AUC** measures how well the model separates
+        resistant and susceptible samples across thresholds.
 
         **F1-score** balances precision and recall.
 
-        **Sensitivity** measures the ability to identify resistant
-        samples.
+        **Sensitivity** measures how well resistant samples
+        are identified.
 
-        **Specificity** measures the ability to identify susceptible
-        samples.
+        **Specificity** measures how well susceptible samples
+        are identified.
 
-        **External validation** evaluates how well the model
-        generalizes to data that was not used during model
-        development.
+        **External validation** evaluates model performance
+        on data independent from model development.
+
+        **Generalization gap** describes the difference between
+        internal and external performance.
 
         These metrics describe model performance. They are not
-        themselves individual-patient treatment recommendations.
+        individual-patient treatment recommendations.
         """
     )
 
 
 # ============================================================
-# 21. RESEARCH DISCLAIMER
+# 22. DISCLAIMER
 # ============================================================
 
 st.divider()
@@ -589,7 +717,8 @@ st.caption(
     """
     TB-ResistAI is a research prototype for exploring
     mutation-based tuberculosis drug-resistance prediction.
-    It is not intended for clinical diagnosis, prescription,
-    or treatment selection.
+
+    It is not intended for clinical diagnosis,
+    prescription, or treatment selection.
     """
 )
