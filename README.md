@@ -105,12 +105,15 @@ represented a genuine test of model generalization.
 
 ## Final Selected Models
 
-  Drug             Final Model             Features   Decision Threshold
-  ---------------- --------------------- ---------- --------------------
-  **Rifampicin**   Random Forest                 30                 0.72
-  **Isoniazid**    Logistic Regression            2                 0.50
-  **Ethambutol**   Random Forest                  8                 0.32
+The final models were selected based on their performance during model development and validation. Each drug uses its finalized model, feature set, and decision threshold.
 
+| Drug | Final Model | Features | Decision Threshold |
+|---|---|---:|---:|
+| **Rifampicin** | **Random Forest** | **30** | **0.72** |
+| **Isoniazid** | **Logistic Regression** | **2** | **0.50** |
+| **Ethambutol** | **Random Forest** | **8** | **0.32** |
+
+The final fitted models are loaded directly by the Streamlit application for inference. The application uses the saved model parameters and does **not retrain the models** during prediction.
 The models stored in the repository are already fitted models. The
 Streamlit application loads these models for inference and does not
 retrain them during application use.
@@ -144,14 +147,21 @@ data.
 
 ## Final External Validation Results
 
-  ------------------------------------------------------------------------------------------
-  Drug                  ROC-AUC          95% CI   Accuracy   Precision     Recall   F1-score
-  ---------------- ------------ --------------- ---------- ----------- ---------- ----------
-  **Rifampicin**     **94.76%**   93.16--96.17%     93.20%      98.34%     87.18%     92.43%
+The final selected models were evaluated on an independent external dataset that was not used during model training, hyperparameter tuning, feature selection, or model selection.
 
-  **Isoniazid**          87.91%   85.93--89.84%     87.90%      97.02%     78.20%     86.60%
+| Drug | ROC-AUC | 95% CI | Accuracy | Precision | Recall | F1-Score |
+|---|---:|---:|---:|---:|---:|---:|
+| **Rifampicin** | **94.76%** | 93.16–96.17% | 93.20% | 98.34% | 87.18% | 92.43% |
+| **Isoniazid** | **87.91%** | 85.93–89.84% | 87.90% | 97.02% | 78.20% | 86.60% |
+| **Ethambutol** | **87.10%** | 84.47–89.60% | 85.40% | 70.06% | 86.11% | 77.26% |
 
-  **Ethambutol**         87.10%   84.47--89.60%     85.40%      70.06%     86.11%     77.26%
+### External Validation Summary
+
+- **Rifampicin:** Highest overall external ROC-AUC at **94.76%**, with high precision (**98.34%**) and F1-score (**92.43%**).
+- **Isoniazid:** External ROC-AUC of **87.91%**, with high precision (**97.02%**) and moderate recall (**78.20%**).
+- **Ethambutol:** External ROC-AUC of **87.10%**, with recall of **86.11%** and precision of **70.06%**.
+
+These results demonstrate that the finalized models retain strong predictive performance when evaluated on independent data, while also showing drug-specific differences in generalization.
   ------------------------------------------------------------------------------------------
 
 ### Rifampicin External ROC-AUC
