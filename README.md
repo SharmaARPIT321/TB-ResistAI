@@ -386,12 +386,20 @@ It does **not** retrain the models when the application is launched.
 
 ### Arpit Sharma --- Machine Learning & Generalization
 
-Led the ML-focused development of the project, including expansion from
-the initial single-mutation approach to multiple genomic features,
-Logistic Regression, Random Forest and XGBoost modeling, model
-comparison, performance evaluation, expanded-feature experiments,
-unseen-data evaluation, independent external cross-dataset validation,
-generalization analysis, and final ML analysis.
+**Machine Learning Development & Experimental Analysis — TB Drug-Resistance Prediction Project**
+
+* Led the ML-focused development of a genomic machine learning pipeline for predicting *Mycobacterium tuberculosis* drug resistance, with an emphasis on model performance, robustness, and generalization to unseen data.
+* Contributed to the expansion of the initial single-mutation-based approach into a **multi-genomic-feature approach**, incorporating additional genomic information to investigate its impact on predictive performance.
+* Developed and evaluated machine learning models using **Logistic Regression, Random Forest, and XGBoost** to compare different classification approaches for drug-resistance prediction.
+* Conducted comparative model evaluation using classification metrics, including accuracy, precision, and ROC-AUC, to assess predictive effectiveness across experimental settings.
+* Performed expanded-feature experiments to examine how incorporating additional genomic features affected model performance, predictive capability, and generalization.
+* Analyzed model behavior across training, test, and unseen-data evaluation settings to investigate performance consistency and potential overfitting.
+* Contributed to the evaluation of predictions across multiple anti-tuberculosis drugs, including **Rifampicin**, to assess the applicability of the ML pipeline to different drug-resistance prediction tasks.
+* Conducted **independent external cross-dataset validation**, evaluating the finalized model on an external dataset kept separate from model training, feature selection, and hyperparameter tuning.
+* Analyzed external-validation results to assess the model's ability to generalize beyond the development dataset and identify potential limitations arising from differences between datasets.
+* Investigated generalization performance by comparing internal test results with independent external results, emphasizing the importance of evaluating models on genuinely unseen genomic data.
+* Contributed to the final ML analysis, interpretation of experimental results, comparison of model configurations, and documentation of the project's evaluation workflow.
+
 
 ### Akash Khushawaha — Data Processing, Feature Engineering & Machine Learning
 
